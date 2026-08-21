@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/backend/socket.io",
+      "destination": "https://frontend-task-chatapp.onrender.com/socket.io/"
+    },
+    {
+      "source": "/backend/socket.io/:path*",
+      "destination": "https://frontend-task-chatapp.onrender.com/socket.io/:path*"
+    },
+    {
+      "source": "/backend/:path*",
+      "destination": "https://frontend-task-chatapp.onrender.com/:path*"
+    }
+  ]
+}
