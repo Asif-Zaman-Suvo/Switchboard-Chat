@@ -60,11 +60,10 @@ npm run dev
 ```
 
 ```
-NEXT_PUBLIC_API_URL=https://frontend-task-chatapp.onrender.com/api
 NEXT_PUBLIC_SOCKET_URL=https://frontend-task-chatapp.onrender.com
 ```
 
-REST is under `/api`. Socket.io is the **host origin**. The first login after a Render sleep can take tens of seconds.
+REST goes to `/backend/api` on this app (rewritten to Render) so Vercel login is not blocked by CORS. Socket.io still uses the Render origin. The first login after a Render sleep can take tens of seconds.
 
 ### Scripts
 

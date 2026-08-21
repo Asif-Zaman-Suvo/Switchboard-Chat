@@ -211,4 +211,4 @@ type Conversation = {
 - Unauthenticated → **400** `NO_TOKEN`, not 401
 - Health not under `/api`
 - Render cold start on first REST/socket
-- CORS: browser → Render directly; socket must stay on the socket origin
+- CORS: REST is proxied at `/backend/*` on this Next app so the Vercel origin does not call Render from the browser. Socket.io still connects to the Render origin.

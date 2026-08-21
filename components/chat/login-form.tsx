@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { login } from "@/lib/api/auth";
-import { ApiError } from "@/lib/api/client";
+import { errorMessage } from "@/lib/api/client";
 import { useSessionStore } from "@/stores/session-store";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -48,11 +48,7 @@ export function LoginForm() {
       setSession(session.token, session.user);
       router.replace("/chat");
     } catch (err) {
-      setApiError(
-        err instanceof ApiError
-          ? err.message
-          : "Couldn’t sign in. The API may be waking up — try again.",
-      );
+      setApiError(errorMessage(err, "Couldn’t sign in. The API may be waking up — try again."));
     } finally {
       setPending(false);
     }
