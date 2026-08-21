@@ -61,9 +61,14 @@ export function useChatSocket() {
       queryClient.invalidateQueries({ queryKey: ["messages"] });
     };
     const onDisconnect = () => setStatus("disconnected");
+    const onConnectError = () => setStatus("disconnected");
     const onMessage = (payload: unknown) => {
       const message = mapMessage(payload);
-      if (!message) return;
+      if (!message) {
+        queryClient.invalidateQueries({ queryKey: ["messages"] });
+        queryClient.invalidateQueries({ queryKey: ["conversations"] });
+        return;
+      }
       queryClient.setQueryData<Message[]>(["messages", message.conversationId], (old) =>
         upsertMessage(old, message),
       );
@@ -79,6 +84,7 @@ export function useChatSocket() {
 
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
+    socket.on("connect_error", onConnectError);
     socket.on("message:new", onMessage);
     socket.on("conversation:updated", onConversation);
     if (socket.connected) onConnect();
@@ -86,10 +92,26 @@ export function useChatSocket() {
     return () => {
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
+      socket.off("connect_error", onConnectError);
       socket.off("message:new", onMessage);
       socket.off("conversation:updated", onConversation);
       disconnectSocket();
       setStatus("idle");
     };
   }, [token, queryClient, setStatus]);
+}
+
+export function useSocketCatchUp() {
+  const token = useSessionStore((s) => s.token);
+  const status = useSocketStatus((s) => s.status);
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!token || status === "connected") return;
+    const id = window.setInterval(() => {
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+      queryClient.invalidateQueries({ queryKey: ["messages"] });
+    }, 4000);
+    return () => window.clearInterval(id);
+  }, [token, status, queryClient]);
 }

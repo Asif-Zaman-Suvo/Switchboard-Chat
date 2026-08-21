@@ -6,11 +6,10 @@ Swagger is **request-only**. Response bodies and status codes below were capture
 
 - Swagger UI: [https://frontend-task-chatapp.onrender.com/docs/](https://frontend-task-chatapp.onrender.com/docs/)
 - REST: `https://frontend-task-chatapp.onrender.com/api`
-- Socket.io: `https://frontend-task-chatapp.onrender.com` (host root, **not** `/api`)
+- Socket.io on the API: host root `/socket.io` (not `/api`)
+- This app proxies REST as `/backend/api` and Socket.io as `/backend/socket.io`
 - Health: `GET https://frontend-task-chatapp.onrender.com/health` → `{ "status": "ok" }`
 - `GET /api/health` is **404**. Swagger lists `/health` under the `/api` server; the live server does not.
-
-The Next app calls these URLs via `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_SOCKET_URL`.
 
 ---
 
@@ -18,7 +17,7 @@ The Next app calls these URLs via `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_SOCKET_
 
 1. `POST /auth/login` with `phone` and `name`. New phone → register; existing phone → login. No signup route.
 2. Protected REST: `Authorization: Bearer <jwt>`.
-3. Socket: `io(SOCKET_URL, { auth: { token } })`.
+3. Socket (this app): `io({ auth: { token }, path: "/backend/socket.io" })` which rewrites to the API’s `/socket.io`.
 
 No token on a protected route → **400**:
 
@@ -211,4 +210,4 @@ type Conversation = {
 - Unauthenticated → **400** `NO_TOKEN`, not 401
 - Health not under `/api`
 - Render cold start on first REST/socket
-- CORS: REST is proxied at `/backend/*` on this Next app so the Vercel origin does not call Render from the browser. Socket.io still connects to the Render origin.
+- CORS: REST and Socket.io both go through `/backend/*` on this Next app so the Vercel origin does not call Render from the browser. If the socket cannot connect, the UI refetches lists every 4s.

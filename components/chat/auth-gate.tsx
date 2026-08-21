@@ -1,6 +1,6 @@
 "use client";
 
-import { useChatSocket } from "@/hooks/use-chat-socket";
+import { useChatSocket, useSocketCatchUp } from "@/hooks/use-chat-socket";
 import { useSession } from "@/hooks/use-session";
 import { Spinner } from "@/components/ui/spinner";
 import { useRouter } from "next/navigation";
@@ -10,6 +10,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const { token, ready } = useSession();
   const router = useRouter();
   useChatSocket();
+  useSocketCatchUp();
 
   useEffect(() => {
     if (ready && !token) router.replace("/login");

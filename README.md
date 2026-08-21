@@ -42,7 +42,7 @@ Not built (API exists, PDF does not require UI): group add/remove/promote/rename
 - **Tailwind CSS 3** + **Inter** (`next/font`)
 - **TanStack Query** — conversations, search, messages
 - **Zustand persist** — `{ token, user }` only
-- **socket.io-client** — origin `NEXT_PUBLIC_SOCKET_URL`, not `/api`
+- **socket.io-client** — same-origin `/backend/socket.io` (rewritten to Render)
 - **Zod** — login fields
 - **Framer Motion** — landing, login enter, new message bubbles
 - **Playwright** — `e2e/` (6 specs, Chromium)
@@ -60,10 +60,8 @@ npm run dev
 ```
 
 ```
-NEXT_PUBLIC_SOCKET_URL=https://frontend-task-chatapp.onrender.com
-```
 
-REST goes to `/backend/api` on this app (rewritten to Render) so Vercel login is not blocked by CORS. Socket.io still uses the Render origin. The first login after a Render sleep can take tens of seconds.
+REST and Socket.io both go through `/backend` on this app (rewritten to Render) so Vercel is not blocked by CORS. If the socket is down, the chat refetches every 4s. The first request after a Render sleep can take tens of seconds.
 
 ### Scripts
 
