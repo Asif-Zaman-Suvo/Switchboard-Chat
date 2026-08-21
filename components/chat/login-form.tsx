@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { login } from "@/lib/api/auth";
 import { errorMessage } from "@/lib/api/client";
+import { canonicalizePhone } from "@/lib/phone";
 import { useSessionStore } from "@/stores/session-store";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -44,7 +45,10 @@ export function LoginForm() {
     setFieldError({});
     setPending(true);
     try {
-      const session = await login(parsed.data);
+      const session = await login({
+        phone: canonicalizePhone(parsed.data.phone) || parsed.data.phone,
+        name: parsed.data.name,
+      });
       setSession(session.token, session.user);
       router.replace("/chat");
     } catch (err) {

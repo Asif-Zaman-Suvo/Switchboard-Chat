@@ -40,7 +40,7 @@ export default function LoginPage() {
         <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-signal">Operator desk</p>
         <h1 className="mt-3 font-serif text-4xl text-paper">Plug into the board.</h1>
         <p className="mt-2 mb-8 text-sm text-mute">
-          Phone + name. If the number is new, the API registers it.
+          Phone + name. Local numbers like 015… are stored as +88015…. Same digits, one account.
         </p>
         <LoginForm />
       </motion.main>

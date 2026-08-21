@@ -7,6 +7,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states";
+import { canonicalizePhone, phonesEqual } from "@/lib/phone";
 import { useSessionStore } from "@/stores/session-store";
 import type { User } from "@/types/api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -49,7 +50,9 @@ export function NewChatDialog({
 
   if (!open) return null;
 
-  const people = (search.data ?? []).filter((u) => u.id !== me?.id);
+  const people = (search.data ?? []).filter(
+    (u) => u.id !== me?.id && !phonesEqual(u.phone, me?.phone ?? ""),
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 md:items-center">
@@ -127,7 +130,9 @@ function UserRow({
         <Avatar name={user.name} />
         <span className="min-w-0">
           <span className="block truncate text-sm text-paper">{user.name}</span>
-          <span className="block truncate font-mono text-[11px] text-mute">{user.phone}</span>
+          <span className="block truncate font-mono text-[11px] text-mute">
+            {canonicalizePhone(user.phone) || user.phone}
+          </span>
         </span>
       </button>
     </li>
@@ -181,7 +186,10 @@ export function CreateGroupDialog({
   if (!open) return null;
 
   const people = (search.data ?? []).filter(
-    (u) => u.id !== me?.id && !picked.some((p) => p.id === u.id),
+    (u) =>
+      u.id !== me?.id &&
+      !phonesEqual(u.phone, me?.phone ?? "") &&
+      !picked.some((p) => p.id === u.id || phonesEqual(p.phone, u.phone)),
   );
   const canCreate = name.trim().length > 0 && picked.length >= 2;
 
