@@ -20,6 +20,40 @@ Local: [http://localhost:3000](http://localhost:3000).
 
 ---
 
+## Screenshots
+
+### Landing — `/`
+
+Product page, not a SaaS template. Hero copy, three operator capabilities, and **Circuit 14**: a local demo of the real thread (send, Ada on a timer, pause if you scroll up). CTA goes to login.
+
+![Landing page with Circuit 14 demo pane](docs/screenshots/01-landing.png)
+
+### Login — `/login`
+
+Phone + name. No separate sign-up — the API registers new numbers. Local `015…` is stored as `+88015…` so the same digits do not become two accounts in this client.
+
+![Login: Plug into the board](docs/screenshots/02-login.png)
+
+### Conversation list — `/chat`
+
+Signed-in shell: identity, New chat / Group, conversation list with last message + time. With no thread selected, the right pane is **Idle circuit**.
+
+![Chat list and idle circuit](docs/screenshots/03-chat-idle.png)
+
+### New 1:1 — search
+
+**New line** searches the switchboard by name or phone (≥2 characters). Opening a person starts or reuses a direct conversation.
+
+![New line search modal](docs/screenshots/04-new-chat.png)
+
+### New group
+
+**New group** requires a name and at least two other people. Creates a named circuit; members show in the thread header.
+
+![New group modal over a thread](docs/screenshots/05-new-group.png)
+
+---
+
 ## What is implemented
 
 - Login with phone + name (API auto-registers). **Phones are canonicalized** before login (`015…` → `+88015…`) so local vs country-code forms do not create a second account in *this* app
