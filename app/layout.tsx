@@ -13,6 +13,10 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Switchboard",
   description: "Live 1-to-1 and group chat console.",
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/apple-icon", type: "image/png" }],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
