@@ -1,35 +1,38 @@
 # Switchboard
 
-Take-home chat app: document the mock API, then ship a 1-to-1 + group messenger and a landing page as **one Next.js app**.
+Take-home chat app: document the mock API, then ship 1-to-1 + group chat and a landing page as **one Next.js app**.
 
-| Part | What | URL |
+**Live demo**
+
+- Landing (Part 2): [https://switchboard-chat-suvo.vercel.app/](https://switchboard-chat-suvo.vercel.app/)
+- Chat (Part 1): [https://switchboard-chat-suvo.vercel.app/chat](https://switchboard-chat-suvo.vercel.app/chat)
+- Repo: `Asif-Zaman-Suvo/Switchboard-Chat`
+
+| Part | What | Route |
 | --- | --- | --- |
 | 2 | Landing | `/` |
 | 1 | Login | `/login` |
-| 1 | Chat list | `/chat` (redirects to `/login` if unsigned) |
+| 1 | Conversation list | `/chat` (unsigned → `/login`) |
 | 1 | Thread | `/chat/[conversationId]` |
 | 1 | API docs | [docs/API.md](docs/API.md) |
 
-Demo locally: [http://localhost:3000](http://localhost:3000). After Vercel: landing `https://<app>.vercel.app/`, chat `https://<app>.vercel.app/chat`.
+Local: [http://localhost:3000](http://localhost:3000).
 
 ---
 
 ## What is implemented
 
-- Login with phone + name (API auto-registers new numbers; no signup screen)
-- JWT in `localStorage` via Zustand persist; restore with `GET /auth/me`
-- Search users by name or phone; start or open a 1-to-1
-- Create a named group (at least two other people)
-- Message history, own vs other bubbles, timestamps, sender names (direct chats use API `participant`)
-- Send via `POST /messages`; empty / whitespace blocked in the composer
-- Optimistic send, failed bubble + Retry
-- Socket.io `message:new` / `conversation:updated`; upsert by message id
-- Reconnect banner + refetch catch-up (Render sleep)
-- Stick-to-bottom scroll; no force-scroll while reading older messages; “New messages” pill
-- Load earlier via `before` cursor
+- Login with phone + name (API auto-registers). **Phones are canonicalized** before login (`015…` → `+88015…`) so local vs country-code forms do not create a second account in *this* app
+- Search collapses users whose numbers match after canonicalization; prefers the `+` form. Searches both local and `+880` variants when the query looks like a phone
+- JWT in `localStorage` (Zustand persist); restore via `GET /auth/me`
+- Start / open 1-to-1; create a named group (≥2 other people)
+- History, own vs other bubbles, timestamps, names (direct chats use API `participant`)
+- Send via `POST /messages`; empty / whitespace blocked; optimistic send; failed bubble + Retry
+- Socket.io `message:new` / `conversation:updated` over **same-origin polling** (`/backend/socket.io`). If the socket is down, lists refetch every 4s
+- Stick-to-bottom; no force-scroll while reading older messages; “New messages” pill; `before` cursor for older pages
 - Loading / empty / error on login, search, lists, send
-- Mobile: list at `/chat`, thread + Back at `/chat/[id]`
-- Landing (switchboard visual) + Framer Motion
+- Mobile: list `/chat`, thread + Back `/chat/[id]`
+- Landing + Framer Motion; Inter
 - Playwright e2e against the live mock API
 
 Not built (API exists, PDF does not require UI): group add/remove/promote/rename.
@@ -39,15 +42,14 @@ Not built (API exists, PDF does not require UI): group add/remove/promote/rename
 ## Stack
 
 - **Next.js 16.3.2** App Router, React 19, TypeScript
-- **Tailwind CSS 3** + **Inter** (`next/font`)
-- **TanStack Query** — conversations, search, messages
-- **Zustand persist** — `{ token, user }` only
-- **socket.io-client** — same-origin `/backend/socket.io` (rewritten to Render)
-- **Zod** — login fields
-- **Framer Motion** — landing, login enter, new message bubbles
-- **Playwright** — `e2e/` (6 specs, Chromium)
+- **Tailwind CSS 3** + **Inter**
+- **TanStack Query**, **Zustand persist**, **Zod**, **Framer Motion**
+- **socket.io-client** — path `/backend/socket.io`, `transports: ["polling"]`, `upgrade: false` (Vercel cannot proxy Engine.IO websocket upgrades; slash-redirects on `socket.io` were 308/404)
+- **Playwright** — `e2e/` (6 Chromium specs)
 
 Skipped: React Hook Form, shadcn, Redux, next-auth.
+
+REST and Socket.io never call Render from the browser. Next/`vercel.json` rewrite `/backend/*` → `https://frontend-task-chatapp.onrender.com/*`. `skipTrailingSlashRedirect` is on so Engine.IO is not 308’d.
 
 ---
 
@@ -59,82 +61,68 @@ cp .env.example .env.local
 npm run dev
 ```
 
-```
-
-REST and Socket.io both go through `/backend` on this app (rewritten to Render) so Vercel is not blocked by CORS. If the socket is down, the chat refetches every 4s. The first request after a Render sleep can take tens of seconds.
-
-### Scripts
+No required env vars. Optional comments live in `.env.example`. First hit after a Render sleep can take tens of seconds; the client retries REST 3 times.
 
 | Command | |
 | --- | --- |
-| `npm run dev` | Turbopack dev server |
+| `npm run dev` | Turbopack |
 | `npm run build` / `npm start` | production |
-| `npx playwright install chromium` | browsers (once) |
-| `npm test` | Playwright (reuses `localhost:3000` if already running) |
-| `npm run test:ui` / `npm run test:headed` | Playwright UI / headed |
+| `npx playwright install chromium` | once |
+| `npm test` | Playwright (reuses `:3000` if already up) |
+| `npm run test:ui` / `npm run test:headed` | UI / headed |
 
-### Playwright coverage
-
-- Landing CTA → `/login`
-- Empty login blocked
-- `/chat` without session → `/login`
-- New phone registers → chat sidebar
-- Search `Ada` in New chat
-- Whitespace composer leaves Send disabled
+Playwright: landing CTA, empty login, `/chat` gate, new-phone register, search `Ada`, whitespace send disabled.
 
 ---
 
 ## Architecture
 
 ```
-app/                 routes: /, /login, /chat, /chat/[id]
+app/                 /, /login, /chat, /chat/[id]
 components/landing   landing + motion
-components/chat      shell, sidebar, message pane, dialogs, login form
-components/ui        Button, Input, Avatar, states
-lib/api              fetch client, feature calls, mappers
+components/chat      shell, sidebar, pane, dialogs, login
+components/ui        primitives
+lib/api              fetch, mappers, users/conversations/messages
+lib/phone.ts         canonicalize + search dedupe
 lib/realtime         socket singleton
-hooks                session restore, socket, stick-to-bottom
+hooks                session, socket, stick-to-bottom
 stores               Zustand session
 e2e                  Playwright
 docs/API.md          Part 1 API documentation
+next.config.ts       rewrites + skipTrailingSlashRedirect
+vercel.json          same rewrites for production
 ```
 
-Chat is a client tree (JWT, socket, scroll). Landing is a client page because of Motion. API JSON is mapped in `lib/api/mappers.ts` (`_id` → `id`, `type: "direct"` + `participant` → conversation title/name lookup, `{ messages, hasMore }` → chronological list).
+Chat is a client tree. Landing is client because of Motion. `lib/api/mappers.ts` turns live JSON into UI types (`_id` → `id`, direct `participant`, `{ messages, hasMore }`).
 
 ---
 
 ## Deploy
 
-Import the GitHub repo into Vercel. Env defaults match `.env.example`. Submissions need a public (or shared) repo **and** two working demo URLs.
+GitHub → Vercel (this project is already at the URLs above). Do **not** set `NEXT_PUBLIC_API_URL` to the Render origin — that reintroduces CORS.
 
 ---
 
 ## Part 3 — Thought process
 
-One App Router project so Parts 1 and 2 share a deploy. Chat cannot be RSC: session, Socket.io, and stick-to-bottom are client state. TanStack Query owns server cache; Zustand only holds the JWT. Direct REST to Render (no BFF) unless CORS appears. Madagascar.
+One App Router app so Parts 1 and 2 share a deploy. Chat is client-only: JWT, Socket.io, and stick-to-bottom cannot live in RSC. TanStack Query owns server cache; Zustand only stores `{ token, user }`. Madagascar.
 
-**Landing:** switchboard palette (ink / brass / signal), product preview of the chat chrome, Inter for UI. Motion is for the landing story and new bubbles, not for replaying history on every load.
+**Landing:** switchboard palette (ink / brass / signal), Inter, motion on hero/preview — not a SaaS template.
 
-**Trade-offs:** no group-admin screens; “Load earlier” instead of infinite scroll; localStorage JWT (the mock API cannot set httpOnly cookies on our domain).
+**Phone identity:** the mock API keys users on the raw `phone` string, so `01521331328` and `+8801521331328` are two rows. We cannot delete theirs. We canonicalize on login (`0…` → `+880…`) and unique-by-canonical-phone in search so the product treats them as one person. Ghost API rows can remain.
+
+**Vercel:** browser → Render was CORS-blocked (login) and Engine.IO was 308/404 on `/backend/socket.io` (dot in the path + trailing-slash redirect). Fix: same-origin `/backend` proxy, explicit `socket.io` rewrite, polling only. 4s REST catch-up if the socket is down — labeled as reconnect, not as “websocket”.
+
+**Trade-offs:** no group-admin UI; “Load earlier” not infinite scroll; localStorage JWT (their API cannot set httpOnly cookies on our domain).
 
 ### AI usage
 
-Cursor was used for OpenAPI extraction, scaffolding, Motion, Playwright, and drafts of this README. Mapper rules, scroll behavior, and the switchboard look were kept as product decisions. Template SaaS landing and treating polling as “realtime” were rejected.
+Cursor: OpenAPI extract, scaffold, Motion, Playwright, Vercel proxy, phone canonicalization, README drafts. Mapper/scroll/switchboard look were kept as product calls. Template landing and calling REST-interval “realtime” were rejected.
 
 ### API issues and workarounds
 
-See [docs/API.md](docs/API.md). Short version:
-
-- Swagger is request-only; we documented live responses ourselves
-- Missing token → **400** `NO_TOKEN` (treat 400/401 as logged out on `/auth/me`)
-- Conversations `{ data }`; search a bare array; messages `{ messages, hasMore }`
-- Direct chat: singular `participant`, not `participants`
-- `lastMessage` has no `_id`; `sender` is a user id string
-- Message field is `conversation`, not `conversationId`
-- `GET /api/health` is 404; health is `/health` on the origin
-- Search `q` is required → debounce, min 2 characters
-- Socket reconnect refetch is catch-up, not polling-as-websocket
+Full list in [docs/API.md](docs/API.md): request-only Swagger; `_id`; `{ data }` vs array vs `{ messages, hasMore }`; direct `participant`; `sender` as id; `conversation` not `conversationId`; **400** `NO_TOKEN`; health on origin not `/api`; Render cold start; duplicate phones by format.
 
 ### If there were more time
 
-Group admin UI, two-browser Playwright for `message:new`, and a Vercel deploy in this repo’s CI.
+Group admin UI, two-browser Playwright for `message:new`, merge/hide duplicate *conversations* that already exist for both phone forms.

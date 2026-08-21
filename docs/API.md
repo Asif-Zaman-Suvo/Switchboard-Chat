@@ -2,22 +2,23 @@
 
 Part 1 deliverable: how this app uses the take-home mock API.
 
-Swagger is **request-only**. Response bodies and status codes below were captured from live HTTP (and how `lib/api/mappers.ts` normalizes them).
+Swagger is **request-only**. Response bodies and status codes were captured from live HTTP and normalized in `lib/api/mappers.ts`.
 
 - Swagger UI: [https://frontend-task-chatapp.onrender.com/docs/](https://frontend-task-chatapp.onrender.com/docs/)
-- REST: `https://frontend-task-chatapp.onrender.com/api`
-- Socket.io on the API: host root `/socket.io` (not `/api`)
-- This app proxies REST as `/backend/api` and Socket.io as `/backend/socket.io`
+- Upstream REST: `https://frontend-task-chatapp.onrender.com/api`
+- Upstream Socket.io: `https://frontend-task-chatapp.onrender.com/socket.io` (host root, **not** `/api`)
+- **This app (browser):** REST ` /backend/api`, Socket.io `/backend/socket.io` (Next/`vercel.json` rewrites to upstream)
 - Health: `GET https://frontend-task-chatapp.onrender.com/health` → `{ "status": "ok" }`
-- `GET /api/health` is **404**. Swagger lists `/health` under the `/api` server; the live server does not.
+- `GET /api/health` is **404** (Swagger lists `/health` under the `/api` server; live does not)
 
 ---
 
 ## Authentication
 
-1. `POST /auth/login` with `phone` and `name`. New phone → register; existing phone → login. No signup route.
-2. Protected REST: `Authorization: Bearer <jwt>`.
-3. Socket (this app): `io({ auth: { token }, path: "/backend/socket.io" })` which rewrites to the API’s `/socket.io`.
+1. `POST /auth/login` with `phone` and `name`. New phone → register; existing **exact string** → login. No signup route.
+2. This app **canonicalizes** `phone` before login (`lib/phone.ts`): `01521331328` → `+8801521331328`. Numbers that already have `+` (e.g. `+1555…`) are left as `+` + digits. The API still keys uniqueness on the raw string; canonicalization is how we avoid a second account for BD local vs `+880`.
+3. Protected REST: `Authorization: Bearer <jwt>`.
+4. Socket: `io({ auth: { token }, path: "/backend/socket.io", addTrailingSlash: false, transports: ["polling"], upgrade: false })`.
 
 No token on a protected route → **400**:
 
@@ -25,7 +26,7 @@ No token on a protected route → **400**:
 { "error": { "message": "No token provided", "code": "NO_TOKEN" } }
 ```
 
-The app treats **400 and 401** on `GET /auth/me` as a logged-out session.
+The app treats **400 and 401** on `GET /auth/me` as logged out.
 
 Validation → **400**:
 
@@ -43,28 +44,28 @@ Validation → **400**:
 
 ## What the UI calls
 
-| Feature | Method | Path | Request |
+Browser paths are `/backend` + upstream path. Upstream paths below are relative to `/api` except Socket.io.
+
+| Feature | Method | Upstream | Request |
 | --- | --- | --- | --- |
-| Login | POST | `/auth/login` | `{ phone, name }` |
+| Login | POST | `/auth/login` | `{ phone, name }` (phone already canonical) |
 | Restore session | GET | `/auth/me` | Bearer |
-| Search people | GET | `/users/search?q=` | `q` required |
+| Search people | GET | `/users/search?q=` | `q` required; UI may issue extra queries for local/`+880` forms then `uniqueByPhone` |
 | List threads | GET | `/conversations` | Bearer |
 | Start 1-to-1 | POST | `/conversations` | `{ userId }` |
 | Create group | POST | `/conversations/group` | `{ name, participantIds }` |
 | History | GET | `/conversations/{id}/messages` | `limit`, `before` |
 | Send | POST | `/messages` | `{ conversationId, text }` |
-| Incoming | Socket | `message:new` | see below |
-| Group change | Socket | `conversation:updated` | invalidate lists |
+| Incoming | Engine.IO | `/socket.io` | event `message:new` |
+| Group change | Engine.IO | `/socket.io` | event `conversation:updated` |
 
-Send is **REST only** in this app (clear errors + optimistic rows). Socket `message:send` exists on the server; we do not use it.
+Send is **REST only** (errors + optimistic rows). Server also has `message:send`; unused.
 
-Group admin REST exists (`POST .../participants`, `DELETE .../participants/{userId}`, `POST .../admins`, `PATCH .../{id}`). **No UI** — not required by the assignment.
+Group admin REST exists. **No UI.**
 
 ---
 
 ## REST details
-
-Paths are relative to `/api`.
 
 ### `POST /auth/login`
 
@@ -82,19 +83,21 @@ Unauthenticated. **200:**
 }
 ```
 
-IDs are `_id` strings. Mapper exposes `id`.
+IDs are `_id`. Mapper exposes `id`.
+
+**Duplicate phones:** `01521331328` and `+8801521331328` are two API users. We cannot merge/delete them. Search shows one row (`uniqueByPhone`, prefers `+`). Login always sends the canonical `+880…` form for `0…` numbers.
 
 ### `GET /auth/me`
 
-Bearer. **200:** same user object as `user` on login (no token wrapper).
+Bearer. **200:** user object (no token wrapper).
 
 ### `GET /users/search?q=`
 
-Bearer. `q` required. **200:** array of `{ "_id", "name", "phone" }` (no `createdAt`). Seed users include “Ada Lovelace”. The UI only fires search at ≥2 characters (debounce 250ms).
+Bearer. `q` required. **200:** `[{ "_id", "name", "phone" }]`. Seed users include “Ada Lovelace”. UI: debounce 250ms, min 2 chars. If `q` looks like a phone, also search canonical `+880…` and `0…` variants, then dedupe.
 
 ### `GET /conversations`
 
-Bearer. **200:** `{ "data": [ ... ] }` — not a bare array.
+Bearer. **200:** `{ "data": [ ... ] }`.
 
 **Direct** (`type: "direct"`):
 
@@ -108,67 +111,61 @@ Bearer. **200:** `{ "data": [ ... ] }` — not a bare array.
 }
 ```
 
-There is **no** `participants` array. The other person is `participant`. The mapper copies that into `participants[]` so the header and bubbles can show the name (otherwise the UI showed “Direct chat” / “Unknown”).
+No `participants` array. Mapper copies `participant` into `participants[]` (otherwise header/bubbles were “Direct chat” / “Unknown”).
 
-**Group** (`type: "group"`): `name`, `participants: User[]`, `admins: string[]`, `createdBy`, plus `lastMessage`.
+**Group** (`type: "group"`): `name`, `participants: User[]`, `admins`, `createdBy`, `lastMessage`.
 
-`lastMessage` has **no** `_id`. Mapper synthesizes a preview id so the sidebar can show the snippet.
+`lastMessage` has **no** `_id`. Mapper synthesizes a preview id.
 
 ### `POST /conversations`
 
-Body: `{ "userId": "<other _id>" }`. Spec: start **or open**. Client navigates to the returned conversation `id` / `_id`.
+`{ "userId" }`. Start or open. Client navigates to returned id.
 
 ### `GET /conversations/{id}/messages`
 
-Query: `limit`, `before` (message id, older page). Not offset pagination.
+`limit`, `before` (message id). Not offset.
 
-**Live 200:**
+**Live 200:** `{ "messages": [ { "_id", "conversation", "sender", "text", "createdAt" } ], "hasMore": false }`
 
-```json
-{
-  "messages": [
-    {
-      "_id": "...",
-      "conversation": "6a885c03e5d6aac975227020",
-      "sender": "6a88554ae5d6aac975224a87",
-      "text": "ki koros",
-      "createdAt": "2026-08-21T14:09:27.097Z"
-    }
-  ],
-  "hasMore": false
-}
-```
-
-- Wrapper is `{ messages, hasMore }`, not `{ data }`
-- Conversation field is `conversation`, not `conversationId`
-- `sender` is a **user id string**, not a populated user
-- Live order is newest-first; the client **sorts by `createdAt` ascending** for the thread
+- `conversation` not `conversationId`
+- `sender` is a user id string
+- API order is newest-first; client sorts `createdAt` ascending
 
 ### `POST /messages`
 
-Body: `{ "conversationId", "text" }`. Composer refuses empty/whitespace. Failed sends stay in the thread with Retry.
+`{ "conversationId", "text" }`. UI blocks empty/whitespace. Failed sends stay in-thread with Retry.
 
 ### `POST /conversations/group`
 
-Body: `{ "name", "participantIds" }` — ids **besides you**. Spec: group = three or more members. UI requires ≥2 other people.
+`{ "name", "participantIds" }` besides you. UI requires ≥2 others. Picker also dedupes by canonical phone.
 
 ---
 
-## WebSocket (Socket.io)
+## Socket.io (this app)
 
-Not in OpenAPI. Handshake confirmed: `GET /socket.io/?EIO=4&transport=polling`.
+Not in OpenAPI. Upstream handshake: `GET /socket.io/?EIO=4&transport=polling`.
+
+**Do not** point the browser at Render. On Vercel that 308/404’d (`/backend/socket.io` without a dedicated rewrite; trailing slash). Client:
 
 ```js
-io("https://frontend-task-chatapp.onrender.com", { auth: { token } });
+io({
+  auth: { token },
+  path: "/backend/socket.io",
+  addTrailingSlash: false,
+  transports: ["polling"],
+  upgrade: false,
+});
 ```
 
-| Direction | Event | App behavior |
+| Direction | Event | App |
 | --- | --- | --- |
-| client → server | `message:send` `{ conversationId, text }` | unused |
-| server → client | `message:new` | map as a Message (or `{ message }`); upsert by `id` |
-| server → client | `conversation:updated` | invalidate conversation (and message) queries |
+| client → server | `message:send` | unused |
+| server → client | `message:new` | map Message; upsert by id; if unparseable, invalidate queries |
+| server → client | `conversation:updated` | invalidate lists |
 
-On `connect`, the app refetches conversations + messages (catch-up after Render sleep). That is **not** polling presented as realtime. Disconnect shows a banner.
+On `connect`, refetch conversations + messages. If status is not `connected`, refetch every **4s** (catch-up). Banner: “Live line dropped…”. That interval is not claimed to be WebSocket.
+
+`skipTrailingSlashRedirect: true` in `next.config.ts`. Explicit rewrites for `/backend/socket.io` and `/backend/socket.io/:path*` in `next.config.ts` and `vercel.json`.
 
 ---
 
@@ -190,7 +187,7 @@ type Message = {
 type Conversation = {
   id: string;
   name: string | null;
-  isGroup: boolean; // from type === "group"
+  isGroup: boolean;
   participantIds: string[];
   participants: User[]; // direct: [participant]
   adminIds: string[];
@@ -201,13 +198,14 @@ type Conversation = {
 
 ---
 
-## Quirks this implementation depends on
+## Quirks
 
-- Request-only OpenAPI — responses documented here from live calls
+- Request-only OpenAPI
 - `_id` vs `id`
-- Three list shapes: search array, conversations `{ data }`, messages `{ messages, hasMore }`
+- Search = array; conversations = `{ data }`; messages = `{ messages, hasMore }`
 - Direct `participant` vs group `participants`
 - Unauthenticated → **400** `NO_TOKEN`, not 401
 - Health not under `/api`
-- Render cold start on first REST/socket
-- CORS: REST and Socket.io both go through `/backend/*` on this Next app so the Vercel origin does not call Render from the browser. If the socket cannot connect, the UI refetches lists every 4s.
+- Render cold start; REST client retries 3 times
+- CORS: never call Render from the Vercel origin
+- Phone uniqueness is string-exact on the API; we canonicalize + dedupe in the client only
