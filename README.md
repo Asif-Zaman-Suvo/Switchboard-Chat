@@ -32,7 +32,7 @@ Local: [http://localhost:3000](http://localhost:3000).
 - Stick-to-bottom; no force-scroll while reading older messages; “New messages” pill; `before` cursor for older pages
 - Loading / empty / error on login, search, lists, send
 - Mobile: list `/chat`, thread + Back `/chat/[id]`
-- Landing + Framer Motion; Inter
+- Landing + Framer Motion; Inter; **Part 2 bonus:** interactive Circuit 14 demo (send, Ada timer, pause on scroll up)
 - Playwright e2e against the live mock API
 
 Not built (API exists, PDF does not require UI): group add/remove/promote/rename.
@@ -71,7 +71,7 @@ No required env vars. Optional comments live in `.env.example`. First hit after 
 | `npm test` | Playwright (reuses `:3000` if already up) |
 | `npm run test:ui` / `npm run test:headed` | UI / headed |
 
-Playwright: landing CTA, empty login, `/chat` gate, new-phone register, search `Ada`, whitespace send disabled.
+Playwright: landing CTA, demo pane send, empty login, `/chat` gate, new-phone register, search `Ada`, whitespace send disabled.
 
 ---
 
@@ -79,7 +79,7 @@ Playwright: landing CTA, empty login, `/chat` gate, new-phone register, search `
 
 ```
 app/                 /, /login, /chat, /chat/[id]
-components/landing   landing + motion
+components/landing   landing + Circuit 14 interactive demo
 components/chat      shell, sidebar, pane, dialogs, login
 components/ui        primitives
 lib/api              fetch, mappers, users/conversations/messages
@@ -107,7 +107,7 @@ GitHub → Vercel (this project is already at the URLs above). Do **not** set `N
 
 One App Router app so Parts 1 and 2 share a deploy. Chat is client-only: JWT, Socket.io, and stick-to-bottom cannot live in RSC. TanStack Query owns server cache; Zustand only stores `{ token, user }`. Madagascar.
 
-**Landing:** switchboard palette (ink / brass / signal), Inter, motion on hero/preview — not a SaaS template.
+**Landing:** switchboard palette (ink / brass / signal), Inter. **Part 2 bonus:** the hero Circuit 14 pane is a local demo of the real chat contract — you can send, Ada replies on a timer, scrolling up **pauses** the script (no yank), “New messages” resumes live. Not a FAQ or testimonial block.
 
 **Phone identity:** the mock API keys users on the raw `phone` string, so `01521331328` and `+8801521331328` are two rows. We cannot delete theirs. We canonicalize on login (`0…` → `+880…`) and unique-by-canonical-phone in search so the product treats them as one person. Ghost API rows can remain.
 

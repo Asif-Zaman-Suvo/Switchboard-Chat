@@ -1,5 +1,6 @@
 "use client";
 
+import { PreviewPanel } from "@/components/landing/preview-panel";
 import { motion } from "framer-motion";
 import Link from "next/link";
 
@@ -47,8 +48,8 @@ export function LandingPage() {
               Every conversation on one brass line.
             </motion.h1>
             <motion.p variants={fadeUp} className="mt-6 max-w-md text-base leading-relaxed text-mute">
-              Search a person. Open a private line or a group circuit. Messages land without a
-              refresh. Built against a real chat API — not a canned demo.
+              Search a person. Open a private line or a group circuit. Try the demo pane on the
+              right — same scroll contract as the real thread. Then plug into the live API.
             </motion.p>
             <motion.div variants={fadeUp} className="mt-8 flex flex-wrap gap-3">
               <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>
@@ -150,67 +151,3 @@ export function LandingPage() {
   );
 }
 
-function PreviewPanel() {
-  return (
-    <motion.div
-      className="border border-line bg-[#100f0c] shadow-[12px_12px_0_0_#2a2620]"
-      initial={{ opacity: 0, y: 24, rotate: 1.2 }}
-      animate={{ opacity: 1, y: 0, rotate: 0 }}
-      transition={{ duration: 0.7, ease, delay: 0.15 }}
-      whileHover={{ y: -6, rotate: -0.4, transition: { duration: 0.3 } }}
-    >
-      <div className="flex items-center justify-between border-b border-line px-4 py-2 font-mono text-[10px] uppercase tracking-[0.2em] text-mute">
-        <span>Circuit 14 · Ada</span>
-        <span className="inline-flex items-center gap-1.5 text-brass">
-          <motion.span
-            className="inline-block h-1.5 w-1.5 rounded-full bg-brass"
-            animate={{ opacity: [1, 0.25, 1] }}
-            transition={{ duration: 1.6, repeat: Infinity }}
-          />
-          Live
-        </span>
-      </div>
-      <div className="space-y-3 p-4">
-        <Bubble mine={false} who="Ada" when="9:14" delay={0.35} text="The line is open. Did the patch land?" />
-        <Bubble mine who="You" when="9:14" delay={0.55} text="Yes. Incoming messages now stick only if you’re at the bottom." />
-        <Bubble mine={false} who="Ada" when="9:15" delay={0.75} text="That’s the whole job." />
-      </div>
-      <div className="flex gap-2 border-t border-line p-3">
-        <div className="h-9 flex-1 border border-line bg-ink px-3 py-2 font-mono text-[11px] text-mute">
-          Transmit…
-        </div>
-        <div className="bg-signal px-3 py-2 text-xs text-paper">Send</div>
-      </div>
-    </motion.div>
-  );
-}
-
-function Bubble({
-  mine,
-  who,
-  when,
-  text,
-  delay,
-}: {
-  mine: boolean;
-  who: string;
-  when: string;
-  text: string;
-  delay: number;
-}) {
-  return (
-    <motion.div
-      className={mine ? "ml-8" : "mr-8"}
-      initial={{ opacity: 0, y: 10, x: mine ? 12 : -12 }}
-      animate={{ opacity: 1, y: 0, x: 0 }}
-      transition={{ duration: 0.4, delay, ease }}
-    >
-      <p className="mb-1 font-mono text-[10px] uppercase tracking-wider text-mute">
-        {who} · {when}
-      </p>
-      <p className={mine ? "bg-brass px-3 py-2 text-sm text-ink" : "border border-line px-3 py-2 text-sm"}>
-        {text}
-      </p>
-    </motion.div>
-  );
-}
